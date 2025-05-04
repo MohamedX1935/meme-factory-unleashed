@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -51,6 +50,15 @@ const defaultMemeState: MemeState = {
   scale: 100
 };
 
+// Helper function to generate a unique ID
+const generateId = (): string => {
+  // Use crypto.randomUUID() if available, otherwise fallback to a simple random string
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15);
+};
+
 const MemeEditor = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +85,7 @@ const MemeEditor = () => {
   const addDefaultTexts = () => {
     const newTexts: TextItem[] = [
       {
-        id: crypto.randomUUID(),
+        id: generateId(),
         text: "TOP TEXT",
         x: 50, // center percentage
         y: 10, // top percentage
@@ -89,7 +97,7 @@ const MemeEditor = () => {
         isMemeStyle: true
       },
       {
-        id: crypto.randomUUID(),
+        id: generateId(),
         text: "BOTTOM TEXT",
         x: 50, // center percentage
         y: 90, // bottom percentage
@@ -171,7 +179,7 @@ const MemeEditor = () => {
 
   const handleAddText = () => {
     const newText: TextItem = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       text: "New Text",
       x: 50,
       y: 50,
