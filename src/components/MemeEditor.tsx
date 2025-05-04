@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { 
   Download, 
-  Image, 
+  Image as ImageIcon, 
   RotateCcw, 
   RotateCw, 
   Plus, 
@@ -53,7 +54,7 @@ const defaultMemeState: MemeState = {
 // Helper function to generate a unique ID
 const generateId = (): string => {
   // Use crypto.randomUUID() if available, otherwise fallback to a simple random string
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
   return Math.random().toString(36).substring(2, 15);
@@ -138,7 +139,8 @@ const MemeEditor = () => {
     const url = prompt("Enter image URL:");
     if (url) {
       try {
-        const img = new Image();
+        // Create an Image instance properly
+        const img = document.createElement('img');
         img.crossOrigin = "anonymous";
         img.onload = () => {
           const canvas = document.createElement("canvas");
@@ -227,7 +229,8 @@ const MemeEditor = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    const img = new Image();
+    // Create an Image instance properly
+    const img = document.createElement('img');
     img.crossOrigin = "anonymous";
     img.onload = () => {
       // Reset canvas and apply canvas dimensions based on image
@@ -351,7 +354,7 @@ const MemeEditor = () => {
         <div className="editor-panel flex flex-col items-center justify-center min-h-[400px]">
           {!localImage ? (
             <div className="flex flex-col items-center gap-4 p-6 animate-fade-in">
-              <Image className="w-16 h-16 text-meme-primary mb-2" />
+              <ImageIcon className="w-16 h-16 text-meme-primary mb-2" />
               <h3 className="text-xl font-semibold text-center">Start creating your meme</h3>
               <div className="flex flex-wrap justify-center gap-3">
                 <Button 
