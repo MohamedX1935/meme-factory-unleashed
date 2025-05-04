@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,7 +11,10 @@ import {
   RotateCw, 
   Plus, 
   Minus,
-  Share
+  Share,
+  Facebook,
+  Instagram,
+  Whatsapp
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MemeTemplateSelector from './MemeTemplateSelector';
@@ -322,23 +324,74 @@ const MemeEditor = () => {
           }, 'image/png');
         });
         
+        // Web Share API (mobile-first approach)
         if (navigator.share) {
-          await navigator.share({
-            files: [new File([blob], 'meme.png', { type: 'image/png' })],
-            title: 'Check out my meme!',
-          });
-          toast.success("Meme shared!");
-        } else {
-          // Fallback if Web Share API is not available
-          const url = URL.createObjectURL(blob);
-          navigator.clipboard.writeText(url);
-          toast.success("Meme URL copied to clipboard!");
+          try {
+            await navigator.share({
+              files: [new File([blob], 'meme.png', { type: 'image/png' })],
+              title: 'Check out my meme!',
+            });
+            toast.success("Meme shared successfully!");
+            return;
+          } catch (error) {
+            console.log("Share API failed, falling back to alternatives", error);
+            // Continue to fallback options
+          }
         }
+        
+        // Fallback: Create a sharable URL
+        const url = URL.createObjectURL(blob);
+        
+        // Copy to clipboard as fallback
+        navigator.clipboard.writeText(url).then(() => {
+          toast.success("Image URL copied to clipboard!");
+        }).catch(() => {
+          // If clipboard fails too, open in new tab as last resort
+          window.open(url, '_blank');
+          toast.success("Meme opened in new tab!");
+        });
       }
     } catch (error) {
       toast.error("Failed to share meme");
       console.error("Share failed:", error);
     }
+  };
+
+  const shareToFacebook = async () => {
+    try {
+      if (canvasRef.current) {
+        const dataUrl = canvasRef.current.toDataURL("image/png");
+        const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&picture=${encodeURIComponent(dataUrl)}`;
+        window.open(shareUrl, '_blank', 'width=600,height=400');
+        toast.success("Opening Facebook share dialog");
+      }
+    } catch (error) {
+      toast.error("Failed to share to Facebook");
+    }
+  };
+
+  const shareToWhatsapp = async () => {
+    try {
+      if (canvasRef.current) {
+        const blob = await new Promise<Blob>((resolve) => {
+          canvasRef.current!.toBlob((blob) => {
+            if (blob) resolve(blob);
+          }, 'image/png');
+        });
+        
+        const url = URL.createObjectURL(blob);
+        const shareUrl = `https://wa.me/?text=Check out my meme! ${encodeURIComponent(url)}`;
+        window.open(shareUrl, '_blank');
+        toast.success("Opening WhatsApp");
+      }
+    } catch (error) {
+      toast.error("Failed to share to WhatsApp");
+    }
+  };
+
+  const shareToInstagram = () => {
+    toast.info("To share to Instagram, download the image and upload it from your Instagram app");
+    downloadMeme();
   };
 
   const resetMeme = () => {
@@ -393,7 +446,7 @@ const MemeEditor = () => {
                 ref={canvasRef} 
                 className="max-w-full mx-auto border border-gray-200 shadow-sm"
               ></canvas>
-              <div className="flex justify-center mt-4 gap-2">
+              <div className="flex justify-center mt-4 gap-2 flex-wrap">
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -412,6 +465,37 @@ const MemeEditor = () => {
                   <Share className="w-4 h-4" />
                   Share
                 </Button>
+                
+                {/* Social media share buttons */}
+                <div className="flex gap-2 mt-2 w-full justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white"
+                    onClick={shareToFacebook}
+                  >
+                    <Facebook className="w-4 h-4" />
+                    Facebook
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white"
+                    onClick={shareToWhatsapp}
+                  >
+                    <Whatsapp className="w-4 h-4" />
+                    WhatsApp
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 hover:from-purple-600 hover:via-pink-600 hover:to-orange-600 text-white"
+                    onClick={shareToInstagram}
+                  >
+                    <Instagram className="w-4 h-4" />
+                    Instagram
+                  </Button>
+                </div>
               </div>
             </div>
           )}
