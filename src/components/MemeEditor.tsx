@@ -14,7 +14,7 @@ import {
   Share,
   Facebook,
   Instagram,
-  WhatsApp
+  MessageSquare
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MemeTemplateSelector from './MemeTemplateSelector';
@@ -483,7 +483,7 @@ const MemeEditor = () => {
                     className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white"
                     onClick={shareToWhatsapp}
                   >
-                    <WhatsApp className="w-4 h-4" />
+                    <MessageSquare className="w-4 h-4" />
                     WhatsApp
                   </Button>
                   <Button
