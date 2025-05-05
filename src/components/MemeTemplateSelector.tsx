@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -181,3 +182,4 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
 };
 
 export default MemeTemplateSelector;
+

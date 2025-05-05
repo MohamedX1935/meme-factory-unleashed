@@ -1,4 +1,5 @@
 
+
 // This is a small subset of templates that will be loaded immediately
 // The full database will be loaded asynchronously
 export const initialMemeTemplates = [
@@ -43,3 +44,4 @@ export interface MemeTemplate {
 
 // Default templates if remote loading fails
 export const memeTemplates = initialMemeTemplates;
+

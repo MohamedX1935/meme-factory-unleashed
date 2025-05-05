@@ -1,4 +1,5 @@
 
+
 import { initialMemeTemplates, MemeTemplate, TEMPLATES_STORAGE_KEY, TEMPLATES_VERSION, TEMPLATES_VERSION_KEY } from "@/data/meme-templates";
 
 // Remote templates source - this would be your API endpoint or JSON file
@@ -72,3 +73,4 @@ function generateMockTemplates(count: number): MemeTemplate[] {
   
   return templates;
 }
+
