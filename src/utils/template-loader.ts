@@ -1,5 +1,4 @@
 
-
 import { initialMemeTemplates, MemeTemplate, TEMPLATES_STORAGE_KEY, TEMPLATES_VERSION, TEMPLATES_VERSION_KEY } from "@/data/meme-templates";
 
 // Remote templates source - this would be your API endpoint or JSON file
@@ -31,46 +30,16 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
     // const response = await fetch(TEMPLATES_URL);
     // const data = await response.json();
     
-    // Simulation of templates for development purposes
-    const simulatedTemplates: MemeTemplate[] = [
-      ...initialMemeTemplates,
-      ...generateMockTemplates(995) // Add 995 more templates to make 999 total
-    ];
+    // Use only the initial templates, without generating more
+    const templates = initialMemeTemplates;
     
     // Cache the templates for future use
-    localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(simulatedTemplates));
+    localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
     localStorage.setItem(TEMPLATES_VERSION_KEY, TEMPLATES_VERSION);
     
-    return simulatedTemplates;
+    return templates;
   } catch (error) {
     console.error("Failed to load templates:", error);
     return initialMemeTemplates; // Fallback to initial templates
   }
 };
-
-// Helper function to generate mock templates for development
-function generateMockTemplates(count: number): MemeTemplate[] {
-  const templates: MemeTemplate[] = [];
-  const categories = ["reactions", "animals", "celebrities", "movies", "tv", "games"];
-  
-  for (let i = 0; i < count; i++) {
-    const categoryIndex = i % categories.length;
-    const id = `template-${i + 1}`;
-    const filename = `meme_template_${i + 1}.jpg`;
-    const name = `Generated Template ${i + 1}`;
-    
-    templates.push({
-      id,
-      name,
-      url: `https://picsum.photos/id/${((i * 17) % 1000) + 1}/500/500`, // Random image from Lorem Picsum
-      filename,
-      category: categories[categoryIndex],
-      tags: [categories[categoryIndex], "generated", i % 2 === 0 ? "funny" : "serious"],
-      width: 500,
-      height: 500
-    });
-  }
-  
-  return templates;
-}
-

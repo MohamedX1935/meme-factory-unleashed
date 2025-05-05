@@ -85,6 +85,12 @@ const MemeEditor = () => {
     }
   }, [localImage]);
 
+  // Clear any cached templates (add this)
+  useEffect(() => {
+    localStorage.removeItem("meme_templates_database");
+    localStorage.removeItem("meme_templates_version");
+  }, []);
+
   const addDefaultTexts = () => {
     const newTexts: TextItem[] = [
       {
