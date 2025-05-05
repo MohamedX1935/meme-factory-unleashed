@@ -1,5 +1,7 @@
 
-export const memeTemplates = [
+// This is a small subset of templates that will be loaded immediately
+// The full database will be loaded asynchronously
+export const initialMemeTemplates = [
   {
     id: "drake",
     name: "Drake Hotline Bling",
@@ -19,65 +21,25 @@ export const memeTemplates = [
     id: "two-buttons",
     name: "Two Buttons",
     url: "https://i.imgflip.com/1g8my4.jpg"
-  },
-  {
-    id: "woman-yelling-cat",
-    name: "Woman Yelling at Cat",
-    url: "https://i.imgflip.com/345v97.jpg"
-  },
-  {
-    id: "expanding-brain",
-    name: "Expanding Brain",
-    url: "https://i.imgflip.com/1jwhww.jpg"
-  },
-  {
-    id: "surprised-pikachu",
-    name: "Surprised Pikachu",
-    url: "https://i.imgflip.com/2kbn1e.jpg"
-  },
-  {
-    id: "one-does-not-simply",
-    name: "One Does Not Simply",
-    url: "https://i.imgflip.com/1bij.jpg"
-  },
-  {
-    id: "epic-handshake",
-    name: "Epic Handshake",
-    url: "https://i.imgflip.com/28j0te.jpg"
-  },
-  {
-    id: "they-are-the-same",
-    name: "They're The Same Picture",
-    url: "https://i.imgflip.com/2za3u1.jpg"
-  },
-  {
-    id: "always-has-been",
-    name: "Always Has Been",
-    url: "https://i.imgflip.com/46e43q.jpg"
-  },
-  {
-    id: "among-us",
-    name: "Among Us",
-    url: "https://i.imgflip.com/4jwjbd.png"
-  },
-  {
-    id: "bernie-mittens",
-    name: "Bernie Sanders Mittens",
-    url: "https://i.imgflip.com/4xbqu9.jpg"
-  },
-  {
-    id: "disaster-girl",
-    name: "Disaster Girl",
-    url: "https://i.imgflip.com/23ls.jpg"
-  },
-  {
-    id: "doge",
-    name: "Doge",
-    url: "https://i.imgflip.com/4t0m5.jpg"
-  },
-  {
-    id: "success-kid",
-    name: "Success Kid",
-    url: "https://i.imgflip.com/1bhk.jpg"
   }
 ];
+
+// Template database version for cache management
+export const TEMPLATES_VERSION = "1.0.0";
+export const TEMPLATES_STORAGE_KEY = "meme_templates_database";
+export const TEMPLATES_VERSION_KEY = "meme_templates_version";
+
+// Full schema for template objects
+export interface MemeTemplate {
+  id: string;
+  name: string;
+  url: string;
+  filename?: string;
+  category?: string;
+  tags?: string[];
+  width?: number;
+  height?: number;
+}
+
+// Default templates if remote loading fails
+export const memeTemplates = initialMemeTemplates;
