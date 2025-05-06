@@ -26,20 +26,25 @@ export const initialMemeTemplates = [
 
 // Version de la base de données des templates pour la gestion du cache
 // Incrémentez cette valeur pour forcer le rechargement du cache
-export const TEMPLATES_VERSION = "1.3.0"; // Incrémenté pour forcer le rechargement
+export const TEMPLATES_VERSION = "1.4.0"; // Incrémenté pour forcer le rechargement
 export const TEMPLATES_STORAGE_KEY = "meme_templates_database";
 export const TEMPLATES_VERSION_KEY = "meme_templates_version";
 
 // Schéma complet pour les objets de templates
 export interface MemeTemplate {
   id: string;
-  name: string;
-  url: string;
+  name?: string;
+  url?: string;
   filename?: string;
+  displayName?: string;
+  thumbnail?: string;
+  fullImage?: string;
   category?: string;
   tags?: string[];
   width?: number;
   height?: number;
+  cloudinaryId?: string;
+  originalSource?: string;
 }
 
 // Templates par défaut en cas d'échec du chargement depuis le serveur

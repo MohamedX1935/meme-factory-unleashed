@@ -84,13 +84,24 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     });
   }, []);
 
+  // Obtenir l'URL d'image à utiliser (thumbnail, fullImage, ou url)
+  const getTemplateImageUrl = (template: MemeTemplate): string => {
+    return template.thumbnail || template.fullImage || template.url || '';
+  };
+  
+  // Obtenir le nom du template à afficher
+  const getTemplateName = (template: MemeTemplate): string => {
+    return template.displayName || template.name || template.id || 'Sans nom';
+  };
+
   // Filtrer les templates selon la requête de recherche
   const filteredTemplates = useMemo(() => {
     if (!searchQuery.trim()) return templates;
     
     const query = searchQuery.toLowerCase();
     return templates.filter(template => 
-      template.name?.toLowerCase().includes(query) || 
+      (template.name?.toLowerCase().includes(query)) || 
+      (template.displayName?.toLowerCase().includes(query)) || 
       (template.filename && template.filename.toLowerCase().includes(query)) ||
       (template.tags && template.tags.some(tag => tag.toLowerCase().includes(query))) ||
       (template.category && template.category.toLowerCase().includes(query))
@@ -207,9 +218,9 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
           <div className="grid grid-cols-2 gap-2">
             {visibleTemplates.map((template) => (
               <Card 
-                key={template.id || template.name}
+                key={template.id}
                 className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
-                onClick={() => onSelect(template.url)}
+                onClick={() => onSelect(template.fullImage || template.url || '')}
               >
                 <div className="p-1 relative">
                   {failedImages.has(template.id) ? (
@@ -221,8 +232,8 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
                     </div>
                   ) : (
                     <img 
-                      src={template.url} 
-                      alt={template.name} 
+                      src={getTemplateImageUrl(template)} 
+                      alt={getTemplateName(template)} 
                       className="w-full h-auto object-cover rounded"
                       loading="lazy"
                       onError={() => handleImageError(template.id)}
@@ -230,7 +241,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
                     />
                   )}
                   <p className="text-xs text-center mt-1 text-muted-foreground line-clamp-1">
-                    {template.name || 'Sans nom'}
+                    {getTemplateName(template)}
                   </p>
                 </div>
               </Card>

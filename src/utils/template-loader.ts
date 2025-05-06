@@ -4,18 +4,9 @@ import { initialMemeTemplates, MemeTemplate, TEMPLATES_STORAGE_KEY, TEMPLATES_VE
 // Chemin vers le fichier JSON contenant les templates depuis le dossier public
 const TEMPLATES_URL = "/templates-database.json";
 
-// Fallback URL format - peut être utilisé si besoin comme backup
-const getGoogleDriveViewUrl = (fileId: string) => 
-  `https://drive.google.com/uc?export=view&id=${fileId}`;
-
-// Fonction principale pour charger tous les templates
 export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
   try {
-    // Vérifier si nous avons une version en cache
-    const storedVersion = localStorage.getItem(TEMPLATES_VERSION_KEY);
-    
-    // Force le rechargement pour débugger
-    console.log("Chargement forcé des templates depuis le fichier JSON");
+    console.log("Chargement des templates depuis le fichier JSON");
     
     try {
       const response = await fetch(TEMPLATES_URL);
@@ -28,26 +19,32 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
       const data = await response.json();
       console.log("Templates JSON chargés:", data);
       
-      // Utiliser les templates du fichier JSON
-      // Vérifier la structure du JSON et extraire les templates
-      const templates = Array.isArray(data) 
-        ? data 
-        : data.templates || data.data || data.memes || [];
+      // Vérifier que data est un tableau
+      if (!Array.isArray(data)) {
+        console.error("Le fichier JSON ne contient pas un tableau");
+        return initialMemeTemplates;
+      }
       
-      // Vérifier que les templates ont bien les propriétés nécessaires
-      const validTemplates = templates
-        .filter((template: any) => template && typeof template === 'object')
-        .map((template: any, index: number) => ({
-          id: template.id || `template-${index}`,
-          name: template.name || template.title || `Template ${index}`,
-          url: template.url || template.src || template.image || '',
-          filename: template.filename || '',
-          category: template.category || '',
-          tags: template.tags || [],
-          width: template.width || 0,
-          height: template.height || 0
-        }))
-        .filter((t: MemeTemplate) => t.url && t.url.trim() !== '');
+      // Mapper les données du JSON vers notre format MemeTemplate
+      const validTemplates = data.map((item: any): MemeTemplate => {
+        return {
+          id: item.id || `template-${Math.random()}`,
+          name: item.displayName || item.name || "",
+          url: item.fullImage || item.url || "",
+          filename: item.filename || "",
+          displayName: item.displayName || "",
+          thumbnail: item.thumbnail || "",
+          fullImage: item.fullImage || "",
+          category: item.category || "",
+          tags: item.tags || [],
+          width: item.width || 0,
+          height: item.height || 0,
+          cloudinaryId: item.cloudinaryId || "",
+          originalSource: item.originalSource || ""
+        };
+      }).filter((t: MemeTemplate) => 
+        t.id && (t.thumbnail || t.fullImage || t.url)
+      );
       
       console.log(`${validTemplates.length} templates valides chargés avec succès`);
       
