@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Loader, RefreshCw } from "lucide-react";
-import { initialMemeTemplates, MemeTemplate } from '@/data/meme-templates';
+import { initialMemeTemplates, MemeTemplate, TEMPLATES_STORAGE_KEY, TEMPLATES_VERSION_KEY } from '@/data/meme-templates';
 import { loadAllTemplates } from '@/utils/template-loader';
 import { toast } from "@/components/ui/use-toast";
 
