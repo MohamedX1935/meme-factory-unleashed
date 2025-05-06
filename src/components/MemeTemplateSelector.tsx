@@ -1,13 +1,13 @@
 
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Loader } from "lucide-react";
+import { Search, Loader, RefreshCw } from "lucide-react";
 import { initialMemeTemplates, MemeTemplate } from '@/data/meme-templates';
 import { loadAllTemplates } from '@/utils/template-loader';
+import { toast } from "@/components/ui/use-toast";
 
 interface MemeTemplateSelectorProps {
   onSelect: (templateUrl: string) => void;
@@ -21,9 +21,9 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
   const [loadedCount, setLoadedCount] = useState(20);
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  const TEMPLATES_PER_PAGE = 20;
+  const TEMPLATES_PER_PAGE = 30;  // Augmenté pour afficher plus de templates à la fois
 
-  // Load all templates when component mounts
+  // Charger tous les templates au montage du composant
   useEffect(() => {
     const fetchTemplates = async () => {
       setIsLoading(true);
@@ -32,8 +32,23 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
         setTemplates(allTemplates);
         setVisibleTemplates(allTemplates.slice(0, TEMPLATES_PER_PAGE));
         setLoadedCount(TEMPLATES_PER_PAGE);
+        
+        // Notifier l'utilisateur du nombre de templates chargés
+        if (allTemplates.length > initialMemeTemplates.length) {
+          toast({
+            title: "Templates chargés avec succès",
+            description: `${allTemplates.length} templates disponibles dans la bibliothèque.`,
+            duration: 3000,
+          });
+        }
       } catch (error) {
-        console.error("Error loading templates:", error);
+        console.error("Erreur lors du chargement des templates:", error);
+        toast({
+          title: "Erreur de chargement",
+          description: "Impossible de charger tous les templates. Utilisation des templates par défaut.",
+          variant: "destructive",
+          duration: 5000,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -42,19 +57,20 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     fetchTemplates();
   }, []);
 
-  // Filter templates based on search query
+  // Filtrer les templates selon la requête de recherche
   const filteredTemplates = useMemo(() => {
     if (!searchQuery.trim()) return templates;
     
     const query = searchQuery.toLowerCase();
     return templates.filter(template => 
-      template.name.toLowerCase().includes(query) || 
+      template.name?.toLowerCase().includes(query) || 
       (template.filename && template.filename.toLowerCase().includes(query)) ||
-      (template.tags && template.tags.some(tag => tag.toLowerCase().includes(query)))
+      (template.tags && template.tags.some(tag => tag.toLowerCase().includes(query))) ||
+      (template.category && template.category.toLowerCase().includes(query))
     );
   }, [searchQuery, templates]);
 
-  // Load more templates when user scrolls
+  // Charger plus de templates quand l'utilisateur fait défiler
   const loadMoreTemplates = useCallback(() => {
     if (loadedCount >= filteredTemplates.length) return;
     
@@ -65,7 +81,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     setLoadedCount(newLoadedCount);
   }, [filteredTemplates, loadedCount]);
 
-  // Set up intersection observer for infinite scrolling
+  // Configurer l'observateur d'intersection pour le défilement infini
   useEffect(() => {
     if (!observerTarget.current) return;
     
@@ -87,11 +103,38 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     };
   }, [loadMoreTemplates, isLoading]);
 
-  // Reset visible templates when search query changes
+  // Réinitialiser les templates visibles quand la requête de recherche change
   useEffect(() => {
     setVisibleTemplates(filteredTemplates.slice(0, TEMPLATES_PER_PAGE));
     setLoadedCount(Math.min(TEMPLATES_PER_PAGE, filteredTemplates.length));
   }, [filteredTemplates]);
+
+  // Fonction pour forcer le rechargement des templates (efface le cache)
+  const handleForceRefresh = async () => {
+    localStorage.removeItem(TEMPLATES_STORAGE_KEY);
+    localStorage.removeItem(TEMPLATES_VERSION_KEY);
+    setIsLoading(true);
+    try {
+      const allTemplates = await loadAllTemplates();
+      setTemplates(allTemplates);
+      setVisibleTemplates(allTemplates.slice(0, TEMPLATES_PER_PAGE));
+      setLoadedCount(TEMPLATES_PER_PAGE);
+      toast({
+        title: "Templates rechargés",
+        description: `${allTemplates.length} templates mis à jour.`,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Erreur lors du rechargement des templates:", error);
+      toast({
+        title: "Erreur de rechargement",
+        description: "Impossible de recharger les templates.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -101,7 +144,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
         </div>
         <Input
           type="text"
-          placeholder="Search templates..."
+          placeholder="Rechercher des templates..."
           className="pl-8"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -111,35 +154,43 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
       <div className="flex justify-between items-center">
         <h3 className="font-medium">
           {templates.length > initialMemeTemplates.length ? (
-            <span className="text-meme-primary font-bold">{templates.length}+</span>
+            <span className="text-meme-primary font-bold">{templates.length}</span>
           ) : (
             <span>{templates.length}</span>
-          )} Templates Available
+          )} Templates disponibles
         </h3>
         
-        {isLoading && (
-          <div className="flex items-center text-sm text-muted-foreground">
-            <Loader className="h-3 w-3 mr-1 animate-spin" />
-            Loading templates...
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isLoading && (
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Loader className="h-3 w-3 mr-1 animate-spin" />
+              Chargement...
+            </div>
+          )}
 
-        {filteredTemplates.length !== templates.length && !isLoading && (
-          <div className="text-xs text-muted-foreground">
-            Showing {filteredTemplates.length} results
-          </div>
-        )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleForceRefresh}
+            disabled={isLoading}
+            title="Recharger tous les templates"
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className="h-3 w-3" />
+            <span className="sr-only md:not-sr-only md:inline-block">Actualiser</span>
+          </Button>
+        </div>
       </div>
 
       {filteredTemplates.length === 0 && !isLoading ? (
         <div className="text-center text-muted-foreground py-8 border border-dashed rounded-md">
-          <p className="mb-2">No templates found matching "{searchQuery}"</p>
+          <p className="mb-2">Aucun template trouvé pour "{searchQuery}"</p>
           <Button 
             variant="outline" 
             size="sm"
             onClick={() => setSearchQuery('')}
           >
-            Clear search
+            Effacer la recherche
           </Button>
         </div>
       ) : (
@@ -147,7 +198,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
           <div className="grid grid-cols-2 gap-2">
             {visibleTemplates.map((template) => (
               <Card 
-                key={template.id}
+                key={template.id || template.name}
                 className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
                 onClick={() => onSelect(template.url)}
               >
@@ -159,14 +210,14 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
                     loading="lazy"
                   />
                   <p className="text-xs text-center mt-1 text-muted-foreground line-clamp-1">
-                    {template.name}
+                    {template.name || 'Sans nom'}
                   </p>
                 </div>
               </Card>
             ))}
           </div>
           
-          {/* Intersection observer target element */}
+          {/* Élément cible pour l'observateur d'intersection */}
           {filteredTemplates.length > loadedCount && (
             <div 
               ref={observerTarget} 
@@ -182,4 +233,3 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
 };
 
 export default MemeTemplateSelector;
-

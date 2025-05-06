@@ -1,7 +1,6 @@
 
-
-// This is a small subset of templates that will be loaded immediately
-// The full database will be loaded asynchronously
+// Un petit sous-ensemble de templates qui seront chargés immédiatement
+// La base de données complète sera chargée de façon asynchrone
 export const initialMemeTemplates = [
   {
     id: "drake",
@@ -25,12 +24,13 @@ export const initialMemeTemplates = [
   }
 ];
 
-// Template database version for cache management
-export const TEMPLATES_VERSION = "1.0.0";
+// Version de la base de données des templates pour la gestion du cache
+// Incrémentez cette valeur pour forcer le rechargement du cache
+export const TEMPLATES_VERSION = "1.1.0";
 export const TEMPLATES_STORAGE_KEY = "meme_templates_database";
 export const TEMPLATES_VERSION_KEY = "meme_templates_version";
 
-// Full schema for template objects
+// Schéma complet pour les objets de templates
 export interface MemeTemplate {
   id: string;
   name: string;
@@ -42,6 +42,5 @@ export interface MemeTemplate {
   height?: number;
 }
 
-// Default templates if remote loading fails
+// Templates par défaut en cas d'échec du chargement depuis le serveur
 export const memeTemplates = initialMemeTemplates;
-
