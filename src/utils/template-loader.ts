@@ -13,16 +13,9 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
   try {
     // Vérifier si nous avons une version en cache
     const storedVersion = localStorage.getItem(TEMPLATES_VERSION_KEY);
-    if (storedVersion === TEMPLATES_VERSION) {
-      const cachedTemplates = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-      if (cachedTemplates) {
-        console.log("Utilisation des templates en cache", JSON.parse(cachedTemplates).length);
-        return JSON.parse(cachedTemplates);
-      }
-    }
-
-    // Si pas de cache ou version différente, charger depuis le fichier JSON
-    console.log("Chargement des templates depuis le fichier JSON");
+    
+    // Force le rechargement pour débugger
+    console.log("Chargement forcé des templates depuis le fichier JSON");
     
     try {
       const response = await fetch(TEMPLATES_URL);
@@ -42,18 +35,26 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
         : data.templates || data.data || data.memes || [];
       
       // Vérifier que les templates ont bien les propriétés nécessaires
-      const validTemplates = templates.map((template: any, index: number) => ({
-        id: template.id || `template-${index}`,
-        name: template.name || template.title || `Template ${index}`,
-        url: template.url || template.src || template.image || '',
-        filename: template.filename || '',
-        category: template.category || '',
-        tags: template.tags || [],
-        width: template.width || 0,
-        height: template.height || 0
-      })).filter((t: MemeTemplate) => t.url && t.url.trim() !== '');
+      const validTemplates = templates
+        .filter((template: any) => template && typeof template === 'object')
+        .map((template: any, index: number) => ({
+          id: template.id || `template-${index}`,
+          name: template.name || template.title || `Template ${index}`,
+          url: template.url || template.src || template.image || '',
+          filename: template.filename || '',
+          category: template.category || '',
+          tags: template.tags || [],
+          width: template.width || 0,
+          height: template.height || 0
+        }))
+        .filter((t: MemeTemplate) => t.url && t.url.trim() !== '');
       
       console.log(`${validTemplates.length} templates valides chargés avec succès`);
+      
+      if (validTemplates.length === 0) {
+        console.warn("Aucun template valide trouvé dans le JSON, utilisation des templates par défaut");
+        return initialMemeTemplates;
+      }
       
       // Mise en cache des templates pour une utilisation future
       localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(validTemplates));
@@ -62,7 +63,8 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
       return validTemplates;
     } catch (fetchError) {
       console.error("Erreur lors du chargement du fichier JSON:", fetchError);
-      throw fetchError;
+      console.log("Utilisation des templates initiaux suite à une erreur");
+      return initialMemeTemplates;
     }
   } catch (error) {
     console.error("Échec du chargement des templates:", error);

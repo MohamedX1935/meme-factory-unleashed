@@ -26,38 +26,54 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
 
   // Charger tous les templates au montage du composant
   useEffect(() => {
-    const fetchTemplates = async () => {
-      setIsLoading(true);
-      try {
-        const allTemplates = await loadAllTemplates();
-        console.log("Templates chargés dans le composant:", allTemplates.length);
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    setIsLoading(true);
+    try {
+      // Forcer le rechargement des templates
+      localStorage.removeItem(TEMPLATES_STORAGE_KEY);
+      localStorage.removeItem(TEMPLATES_VERSION_KEY);
+      
+      const allTemplates = await loadAllTemplates();
+      console.log("Templates chargés dans le composant:", allTemplates.length);
+      
+      if (allTemplates.length === 0) {
+        toast({
+          title: "Aucun template trouvé",
+          description: "Impossible de charger les templates. Veuillez vérifier le fichier JSON.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        setTemplates(initialMemeTemplates);
+        setVisibleTemplates(initialMemeTemplates);
+      } else {
         setTemplates(allTemplates);
         setVisibleTemplates(allTemplates.slice(0, TEMPLATES_PER_PAGE));
         setLoadedCount(TEMPLATES_PER_PAGE);
         
         // Notifier l'utilisateur du nombre de templates chargés
-        if (allTemplates.length > initialMemeTemplates.length) {
-          toast({
-            title: "Templates chargés avec succès",
-            description: `${allTemplates.length} templates disponibles dans la bibliothèque.`,
-            duration: 3000,
-          });
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des templates:", error);
         toast({
-          title: "Erreur de chargement",
-          description: "Impossible de charger tous les templates. Utilisation des templates par défaut.",
-          variant: "destructive",
-          duration: 5000,
+          title: "Templates chargés avec succès",
+          description: `${allTemplates.length} templates disponibles dans la bibliothèque.`,
+          duration: 3000,
         });
-      } finally {
-        setIsLoading(false);
       }
-    };
-
-    fetchTemplates();
-  }, []);
+    } catch (error) {
+      console.error("Erreur lors du chargement des templates:", error);
+      toast({
+        title: "Erreur de chargement",
+        description: "Impossible de charger tous les templates. Utilisation des templates par défaut.",
+        variant: "destructive",
+        duration: 5000,
+      });
+      setTemplates(initialMemeTemplates);
+      setVisibleTemplates(initialMemeTemplates);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Gérer les erreurs de chargement d'image
   const handleImageError = useCallback((templateId: string) => {
@@ -126,26 +142,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     localStorage.removeItem(TEMPLATES_VERSION_KEY);
     setIsLoading(true);
     setFailedImages(new Set());
-    try {
-      const allTemplates = await loadAllTemplates();
-      setTemplates(allTemplates);
-      setVisibleTemplates(allTemplates.slice(0, TEMPLATES_PER_PAGE));
-      setLoadedCount(TEMPLATES_PER_PAGE);
-      toast({
-        title: "Templates rechargés",
-        description: `${allTemplates.length} templates mis à jour.`,
-        duration: 3000,
-      });
-    } catch (error) {
-      console.error("Erreur lors du rechargement des templates:", error);
-      toast({
-        title: "Erreur de rechargement",
-        description: "Impossible de recharger les templates.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await fetchTemplates();
   };
 
   return (
