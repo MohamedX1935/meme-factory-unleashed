@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,13 +15,15 @@ import {
   Share,
   Facebook,
   Instagram,
-  MessageSquare
+  MessageSquare,
+  Layers
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MemeTemplateSelector from './MemeTemplateSelector';
 import TextEditor from './TextEditor';
 import ImageAdjuster from './ImageAdjuster';
 import { useLocalStorage } from '@/hooks/use-local-storage';
+import ImageOverlayEditor from './ImageOverlayEditor';
 
 export type TextItem = {
   id: string;
@@ -35,9 +38,22 @@ export type TextItem = {
   isMemeStyle: boolean;
 };
 
+export type ImageOverlayItem = {
+  id: string;
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  layerIndex: number;
+  name?: string;
+};
+
 export type MemeState = {
   image: string | null;
   texts: TextItem[];
+  imageOverlays: ImageOverlayItem[];
   brightness: number;
   contrast: number;
   rotation: number;
@@ -47,6 +63,7 @@ export type MemeState = {
 const defaultMemeState: MemeState = {
   image: null,
   texts: [],
+  imageOverlays: [],
   brightness: 100,
   contrast: 100,
   rotation: 0,
@@ -65,10 +82,12 @@ const generateId = (): string => {
 const MemeEditor = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const overlayFileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("image");
   const [memeState, setMemeState] = useLocalStorage<MemeState>("meme-factory-state", defaultMemeState);
   const [localImage, setLocalImage] = useState<string | null>(null);
+  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
 
   // If image has been loaded, restore from localStorage
   useEffect(() => {
@@ -143,6 +162,40 @@ const MemeEditor = () => {
     }
   };
 
+  const handleOverlayImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageDataUrl = e.target?.result as string;
+        addImageOverlay(imageDataUrl, file.name);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addImageOverlay = (src: string, name?: string) => {
+    const newOverlay: ImageOverlayItem = {
+      id: generateId(),
+      src,
+      x: 50, // center percentage
+      y: 50, // center percentage
+      width: 100, // pixels or percentage based on implementation
+      height: 100, // pixels or percentage based on implementation
+      rotation: 0,
+      layerIndex: memeState.imageOverlays.length,
+      name: name,
+    };
+
+    setMemeState({
+      ...memeState,
+      imageOverlays: [...memeState.imageOverlays, newOverlay]
+    });
+    
+    setSelectedOverlayId(newOverlay.id);
+    toast.success("Image overlay added!");
+  };
+
   const handleUrlImport = () => {
     const url = prompt("Enter image URL:");
     if (url) {
@@ -172,6 +225,33 @@ const MemeEditor = () => {
         img.src = url;
       } catch (error) {
         toast.error("Failed to import image.");
+      }
+    }
+  };
+
+  const handleOverlayUrlImport = () => {
+    const url = prompt("Enter image URL for overlay:");
+    if (url) {
+      try {
+        // Create an Image instance properly
+        const img = document.createElement('img');
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL("image/png");
+          
+          addImageOverlay(dataUrl, url.split('/').pop());
+        };
+        img.onerror = () => {
+          toast.error("Failed to load overlay image. Please check the URL or try another image.");
+        };
+        img.src = url;
+      } catch (error) {
+        toast.error("Failed to import overlay image.");
       }
     }
   };
@@ -216,6 +296,15 @@ const MemeEditor = () => {
     });
   };
 
+  const handleOverlayChange = (id: string, updates: Partial<ImageOverlayItem>) => {
+    setMemeState({
+      ...memeState,
+      imageOverlays: memeState.imageOverlays.map(overlay => 
+        overlay.id === id ? { ...overlay, ...updates } : overlay
+      )
+    });
+  };
+
   const handleDeleteText = (id: string) => {
     setMemeState({
       ...memeState,
@@ -223,10 +312,87 @@ const MemeEditor = () => {
     });
   };
 
+  const handleDeleteOverlay = (id: string) => {
+    setMemeState({
+      ...memeState,
+      imageOverlays: memeState.imageOverlays.filter(overlay => overlay.id !== id)
+    });
+    if (selectedOverlayId === id) {
+      setSelectedOverlayId(null);
+    }
+  };
+
+  const handleDuplicateOverlay = (id: string) => {
+    const overlayToDuplicate = memeState.imageOverlays.find(overlay => overlay.id === id);
+    if (overlayToDuplicate) {
+      const newOverlay: ImageOverlayItem = {
+        ...overlayToDuplicate,
+        id: generateId(),
+        x: overlayToDuplicate.x + 5,
+        y: overlayToDuplicate.y + 5,
+        layerIndex: memeState.imageOverlays.length
+      };
+
+      setMemeState({
+        ...memeState,
+        imageOverlays: [...memeState.imageOverlays, newOverlay]
+      });
+      
+      setSelectedOverlayId(newOverlay.id);
+      toast.success("Image overlay duplicated!");
+    }
+  };
+
   const updateImageSettings = (setting: keyof MemeState, value: number) => {
     setMemeState({
       ...memeState,
       [setting]: value
+    });
+  };
+
+  const bringOverlayForward = (id: string) => {
+    const overlaysWithUpdatedIndices = [...memeState.imageOverlays]
+      .sort((a, b) => a.layerIndex - b.layerIndex)
+      .map((overlay, index) => ({
+        ...overlay,
+        layerIndex: index
+      }));
+      
+    const overlayIndex = overlaysWithUpdatedIndices.findIndex(o => o.id === id);
+    
+    if (overlayIndex < overlaysWithUpdatedIndices.length - 1) {
+      // Swap with next item
+      const temp = overlaysWithUpdatedIndices[overlayIndex].layerIndex;
+      overlaysWithUpdatedIndices[overlayIndex].layerIndex = overlaysWithUpdatedIndices[overlayIndex + 1].layerIndex;
+      overlaysWithUpdatedIndices[overlayIndex + 1].layerIndex = temp;
+    }
+    
+    setMemeState({
+      ...memeState,
+      imageOverlays: overlaysWithUpdatedIndices
+    });
+  };
+  
+  const sendOverlayBackward = (id: string) => {
+    const overlaysWithUpdatedIndices = [...memeState.imageOverlays]
+      .sort((a, b) => a.layerIndex - b.layerIndex)
+      .map((overlay, index) => ({
+        ...overlay,
+        layerIndex: index
+      }));
+      
+    const overlayIndex = overlaysWithUpdatedIndices.findIndex(o => o.id === id);
+    
+    if (overlayIndex > 0) {
+      // Swap with previous item
+      const temp = overlaysWithUpdatedIndices[overlayIndex].layerIndex;
+      overlaysWithUpdatedIndices[overlayIndex].layerIndex = overlaysWithUpdatedIndices[overlayIndex - 1].layerIndex;
+      overlaysWithUpdatedIndices[overlayIndex - 1].layerIndex = temp;
+    }
+    
+    setMemeState({
+      ...memeState,
+      imageOverlays: overlaysWithUpdatedIndices
     });
   };
 
@@ -261,9 +427,44 @@ const MemeEditor = () => {
       ctx.filter = `brightness(${memeState.brightness}%) contrast(${memeState.contrast}%)`;
       ctx.drawImage(img, -img.width / 2, -img.height / 2, img.width, img.height);
       
-      // Reset transformations for text
+      // Reset transformations
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.filter = 'none';
+      
+      // Draw image overlays in order of layerIndex
+      const sortedOverlays = [...memeState.imageOverlays].sort((a, b) => a.layerIndex - b.layerIndex);
+      
+      sortedOverlays.forEach(overlay => {
+        const overlayImg = new Image();
+        overlayImg.onload = () => {
+          // Calculate position based on percentages
+          const x = (overlay.x / 100) * canvas.width;
+          const y = (overlay.y / 100) * canvas.height;
+          
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate((overlay.rotation * Math.PI) / 180);
+          
+          // Draw the overlay image centered at its position
+          ctx.drawImage(
+            overlayImg, 
+            -overlay.width / 2, 
+            -overlay.height / 2, 
+            overlay.width, 
+            overlay.height
+          );
+          
+          // Highlight selected overlay
+          if (selectedOverlayId === overlay.id) {
+            ctx.strokeStyle = '#4287f5';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+          }
+          
+          ctx.restore();
+        };
+        overlayImg.src = overlay.src;
+      });
       
       // Draw texts
       memeState.texts.forEach(textItem => {
@@ -307,7 +508,7 @@ const MemeEditor = () => {
   // Render the meme whenever the state changes
   useEffect(() => {
     renderMemeToCanvas();
-  }, [localImage, memeState]);
+  }, [localImage, memeState, selectedOverlayId]);
 
   const downloadMeme = () => {
     if (canvasRef.current) {
@@ -505,14 +706,24 @@ const MemeEditor = () => {
               </div>
             </div>
           )}
+          
+          {/* Hidden input for overlay images */}
+          <input
+            type="file"
+            ref={overlayFileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleOverlayImageUpload}
+          />
         </div>
 
         {/* Editor Controls */}
         <div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-3">
+            <TabsList className="w-full grid grid-cols-4">
               <TabsTrigger value="image">Image</TabsTrigger>
               <TabsTrigger value="text">Text</TabsTrigger>
+              <TabsTrigger value="overlay">Stickers</TabsTrigger>
               <TabsTrigger value="templates">Templates</TabsTrigger>
             </TabsList>
             <Card className="mt-2 p-4">
@@ -542,6 +753,26 @@ const MemeEditor = () => {
                     onTextChange={handleTextChange}
                     onAddText={handleAddText}
                     onDeleteText={handleDeleteText}
+                  />
+                )}
+              </TabsContent>
+              <TabsContent value="overlay">
+                {!localImage ? (
+                  <div className="text-center py-6">
+                    <p className="text-muted-foreground">Upload an image or select a template to add stickers</p>
+                  </div>
+                ) : (
+                  <ImageOverlayEditor
+                    imageOverlays={memeState.imageOverlays}
+                    selectedOverlayId={selectedOverlayId}
+                    onSelectedOverlayChange={setSelectedOverlayId}
+                    onOverlayChange={handleOverlayChange}
+                    onAddOverlay={() => overlayFileInputRef.current?.click()}
+                    onAddOverlayByUrl={handleOverlayUrlImport}
+                    onDeleteOverlay={handleDeleteOverlay}
+                    onDuplicateOverlay={handleDuplicateOverlay}
+                    onBringForward={bringOverlayForward}
+                    onSendBackward={sendOverlayBackward}
                   />
                 )}
               </TabsContent>
