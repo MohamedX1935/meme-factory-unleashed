@@ -1,7 +1,7 @@
 
 import { initialMemeTemplates, MemeTemplate, TEMPLATES_STORAGE_KEY, TEMPLATES_VERSION, TEMPLATES_VERSION_KEY } from "@/data/meme-templates";
 
-// Chemin vers le fichier JSON contenant les templates depuis Cloudinary
+// Chemin vers le fichier JSON contenant les templates depuis le dossier public
 const TEMPLATES_URL = "/templates-database.json";
 
 // Fallback URL format - peut être utilisé si besoin comme backup
@@ -16,7 +16,7 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
     if (storedVersion === TEMPLATES_VERSION) {
       const cachedTemplates = localStorage.getItem(TEMPLATES_STORAGE_KEY);
       if (cachedTemplates) {
-        console.log("Utilisation des templates en cache");
+        console.log("Utilisation des templates en cache", JSON.parse(cachedTemplates).length);
         return JSON.parse(cachedTemplates);
       }
     }
@@ -28,23 +28,38 @@ export const loadAllTemplates = async (): Promise<MemeTemplate[]> => {
       const response = await fetch(TEMPLATES_URL);
       
       if (!response.ok) {
+        console.error(`Erreur lors du chargement des templates: ${response.status}`);
         throw new Error(`Erreur lors du chargement des templates: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log("Templates JSON chargés:", data);
       
       // Utiliser les templates du fichier JSON
-      // Si le fichier contient un tableau direct, utilisez data
-      // Si le fichier a une structure différente, adaptez cette ligne
-      const templates = Array.isArray(data) ? data : data.templates || [];
+      // Vérifier la structure du JSON et extraire les templates
+      const templates = Array.isArray(data) 
+        ? data 
+        : data.templates || data.data || data.memes || [];
       
-      console.log(`${templates.length} templates chargés avec succès`);
+      // Vérifier que les templates ont bien les propriétés nécessaires
+      const validTemplates = templates.map((template: any, index: number) => ({
+        id: template.id || `template-${index}`,
+        name: template.name || template.title || `Template ${index}`,
+        url: template.url || template.src || template.image || '',
+        filename: template.filename || '',
+        category: template.category || '',
+        tags: template.tags || [],
+        width: template.width || 0,
+        height: template.height || 0
+      })).filter((t: MemeTemplate) => t.url && t.url.trim() !== '');
+      
+      console.log(`${validTemplates.length} templates valides chargés avec succès`);
       
       // Mise en cache des templates pour une utilisation future
-      localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+      localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(validTemplates));
       localStorage.setItem(TEMPLATES_VERSION_KEY, TEMPLATES_VERSION);
       
-      return templates;
+      return validTemplates;
     } catch (fetchError) {
       console.error("Erreur lors du chargement du fichier JSON:", fetchError);
       throw fetchError;

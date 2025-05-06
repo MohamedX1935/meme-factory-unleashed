@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Loader, RefreshCw } from "lucide-react";
+import { Search, Loader, RefreshCw, ImageOff } from "lucide-react";
 import { initialMemeTemplates, MemeTemplate, TEMPLATES_STORAGE_KEY, TEMPLATES_VERSION_KEY } from '@/data/meme-templates';
 import { loadAllTemplates } from '@/utils/template-loader';
 import { toast } from "@/components/ui/use-toast";
@@ -19,6 +19,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
   const [visibleTemplates, setVisibleTemplates] = useState<MemeTemplate[]>(initialMemeTemplates);
   const [isLoading, setIsLoading] = useState(true);
   const [loadedCount, setLoadedCount] = useState(20);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const observerTarget = useRef<HTMLDivElement>(null);
 
   const TEMPLATES_PER_PAGE = 30;  // Augmenté pour afficher plus de templates à la fois
@@ -29,6 +30,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
       setIsLoading(true);
       try {
         const allTemplates = await loadAllTemplates();
+        console.log("Templates chargés dans le composant:", allTemplates.length);
         setTemplates(allTemplates);
         setVisibleTemplates(allTemplates.slice(0, TEMPLATES_PER_PAGE));
         setLoadedCount(TEMPLATES_PER_PAGE);
@@ -55,6 +57,15 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     };
 
     fetchTemplates();
+  }, []);
+
+  // Gérer les erreurs de chargement d'image
+  const handleImageError = useCallback((templateId: string) => {
+    setFailedImages(prev => {
+      const newSet = new Set(prev);
+      newSet.add(templateId);
+      return newSet;
+    });
   }, []);
 
   // Filtrer les templates selon la requête de recherche
@@ -114,6 +125,7 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
     localStorage.removeItem(TEMPLATES_STORAGE_KEY);
     localStorage.removeItem(TEMPLATES_VERSION_KEY);
     setIsLoading(true);
+    setFailedImages(new Set());
     try {
       const allTemplates = await loadAllTemplates();
       setTemplates(allTemplates);
@@ -202,13 +214,24 @@ const MemeTemplateSelector: React.FC<MemeTemplateSelectorProps> = ({ onSelect })
                 className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
                 onClick={() => onSelect(template.url)}
               >
-                <div className="p-1">
-                  <img 
-                    src={template.url} 
-                    alt={template.name} 
-                    className="w-full h-auto object-cover rounded"
-                    loading="lazy"
-                  />
+                <div className="p-1 relative">
+                  {failedImages.has(template.id) ? (
+                    <div className="flex flex-col items-center justify-center h-32 bg-gray-100 rounded">
+                      <ImageOff className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-xs text-center mt-1 text-muted-foreground">
+                        Image non disponible
+                      </p>
+                    </div>
+                  ) : (
+                    <img 
+                      src={template.url} 
+                      alt={template.name} 
+                      className="w-full h-auto object-cover rounded"
+                      loading="lazy"
+                      onError={() => handleImageError(template.id)}
+                      style={{ minHeight: "80px" }}
+                    />
+                  )}
                   <p className="text-xs text-center mt-1 text-muted-foreground line-clamp-1">
                     {template.name || 'Sans nom'}
                   </p>
