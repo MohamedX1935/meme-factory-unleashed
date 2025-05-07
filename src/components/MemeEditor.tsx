@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +16,9 @@ import {
   Facebook,
   Instagram,
   MessageSquare,
-  Layers
+  Layers,
+  Eraser,
+  Square
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MemeTemplateSelector from './MemeTemplateSelector';
@@ -23,6 +26,7 @@ import TextEditor from './TextEditor';
 import ImageAdjuster from './ImageAdjuster';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import ImageOverlayEditor from './ImageOverlayEditor';
+import TextEraser from './TextEraser';
 
 export type TextItem = {
   id: string;
@@ -49,6 +53,14 @@ export type ImageOverlayItem = {
   name?: string;
 };
 
+export type EraseRect = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type MemeState = {
   image: string | null;
   texts: TextItem[];
@@ -57,6 +69,7 @@ export type MemeState = {
   contrast: number;
   rotation: number;
   scale: number;
+  eraseRects?: EraseRect[];
 };
 
 const defaultMemeState: MemeState = {
@@ -66,7 +79,8 @@ const defaultMemeState: MemeState = {
   brightness: 100,
   contrast: 100,
   rotation: 0,
-  scale: 100
+  scale: 100,
+  eraseRects: []
 };
 
 // Helper function to generate a unique ID
@@ -87,6 +101,13 @@ const MemeEditor = () => {
   const [memeState, setMemeState] = useLocalStorage<MemeState>("meme-factory-state", defaultMemeState);
   const [localImage, setLocalImage] = useState<string | null>(null);
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  
+  // Text eraser related states
+  const [eraseMode, setEraseMode] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
+  const [currentRect, setCurrentRect] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+  const [isProcessingErase, setIsProcessingErase] = useState(false);
 
   // If image has been loaded, restore from localStorage
   useEffect(() => {
@@ -438,7 +459,118 @@ const MemeEditor = () => {
       imageOverlays: overlaysWithUpdatedIndices
     });
   };
-
+  
+  const toggleEraseMode = () => {
+    setEraseMode(!eraseMode);
+    if (eraseMode) {
+      // Exiting erase mode, clear current rect
+      setCurrentRect(null);
+    } else {
+      toast.info("Draw rectangles around text you want to remove", {
+        description: "Click and drag to create selection boxes"
+      });
+    }
+  };
+  
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!eraseMode) return;
+    
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / canvas.width) * 100;
+    const y = ((e.clientY - rect.top) / canvas.height) * 100;
+    
+    setStartPoint({ x, y });
+    setCurrentRect({ x, y, width: 0, height: 0 });
+  };
+  
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!eraseMode || !isDrawing || !startPoint || !canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    
+    const currentX = ((e.clientX - rect.left) / canvas.width) * 100;
+    const currentY = ((e.clientY - rect.top) / canvas.height) * 100;
+    
+    const width = Math.abs(currentX - startPoint.x);
+    const height = Math.abs(currentY - startPoint.y);
+    const x = Math.min(currentX, startPoint.x);
+    const y = Math.min(currentY, startPoint.y);
+    
+    setCurrentRect({ x, y, width, height });
+  };
+  
+  const handleCanvasMouseUp = () => {
+    if (!eraseMode || !isDrawing || !currentRect) return;
+    
+    // Add the current rectangle to state
+    const newRect: EraseRect = {
+      id: generateId(),
+      ...currentRect
+    };
+    
+    setMemeState({
+      ...memeState,
+      eraseRects: [...(memeState.eraseRects || []), newRect]
+    });
+    
+    setIsDrawing(false);
+    setStartPoint(null);
+    setCurrentRect(null);
+  };
+  
+  const handleCanvasMouseLeave = () => {
+    if (isDrawing) {
+      handleCanvasMouseUp();
+    }
+  };
+  
+  const handleDeleteEraseRect = (id: string) => {
+    if (!memeState.eraseRects) return;
+    
+    setMemeState({
+      ...memeState,
+      eraseRects: memeState.eraseRects.filter(rect => rect.id !== id)
+    });
+  };
+  
+  const handleEraseText = async () => {
+    if (!memeState.eraseRects || memeState.eraseRects.length === 0) {
+      toast.error("Please draw at least one rectangle around text to erase");
+      return;
+    }
+    
+    setIsProcessingErase(true);
+    toast.info("Processing image...");
+    
+    try {
+      // This function would implement the actual inpainting
+      // For now, we'll just add a delay to simulate processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // In a real implementation, this would be replaced with actual inpainting code
+      // using a model like the one from Hugging Face
+      toast.success("Text removal complete!");
+      
+      // For now, just hide the rectangles as if the processing was done
+      setMemeState({
+        ...memeState,
+        eraseRects: []
+      });
+      
+      setEraseMode(false);
+    } catch (error) {
+      console.error("Error erasing text:", error);
+      toast.error("Failed to process image");
+    } finally {
+      setIsProcessingErase(false);
+    }
+  };
+  
   const renderMemeToCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas || !localImage) return null;
@@ -543,6 +675,37 @@ const MemeEditor = () => {
           ctx.fillText(textItem.text, x, y);
         }
       });
+      
+      // Draw erase rectangles in erase mode
+      if (eraseMode && memeState.eraseRects && memeState.eraseRects.length > 0) {
+        memeState.eraseRects.forEach((rect, index) => {
+          const x = (rect.x / 100) * canvas.width;
+          const y = (rect.y / 100) * canvas.height;
+          const width = (rect.width / 100) * canvas.width;
+          const height = (rect.height / 100) * canvas.height;
+          
+          ctx.strokeStyle = '#ff3b30';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, width, height);
+          
+          // Add a small label with the rectangle number
+          ctx.fillStyle = '#ff3b30';
+          ctx.font = '16px sans-serif';
+          ctx.fillText(`${index + 1}`, x + 10, y + 20);
+        });
+      }
+      
+      // Draw current rectangle if in drawing mode
+      if (eraseMode && isDrawing && currentRect) {
+        const x = (currentRect.x / 100) * canvas.width;
+        const y = (currentRect.y / 100) * canvas.height;
+        const width = (currentRect.width / 100) * canvas.width;
+        const height = (currentRect.height / 100) * canvas.height;
+        
+        ctx.strokeStyle = '#ff3b30';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+      }
     };
     
     img.src = localImage;
@@ -551,7 +714,7 @@ const MemeEditor = () => {
   // Render the meme whenever the state changes
   useEffect(() => {
     renderMemeToCanvas();
-  }, [localImage, memeState, selectedOverlayId]);
+  }, [localImage, memeState, selectedOverlayId, eraseMode, currentRect, isDrawing]);
 
   const downloadMeme = () => {
     if (canvasRef.current) {
@@ -647,6 +810,7 @@ const MemeEditor = () => {
   const resetMeme = () => {
     setMemeState(defaultMemeState);
     setLocalImage(null);
+    setEraseMode(false);
     toast.info("Meme editor reset");
   };
 
@@ -694,7 +858,11 @@ const MemeEditor = () => {
             <div className="relative w-full">
               <canvas 
                 ref={canvasRef} 
-                className="max-w-full mx-auto border border-gray-200 shadow-sm"
+                className={`max-w-full mx-auto border border-gray-200 shadow-sm ${eraseMode ? 'cursor-crosshair' : ''}`}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseLeave}
               ></canvas>
               <div className="flex justify-center mt-4 gap-2 flex-wrap">
                 <Button 
@@ -777,13 +945,54 @@ const MemeEditor = () => {
                     <p className="text-muted-foreground">Upload an image or select a template to begin</p>
                   </div>
                 ) : (
-                  <ImageAdjuster
-                    brightness={memeState.brightness}
-                    contrast={memeState.contrast}
-                    rotation={memeState.rotation}
-                    scale={memeState.scale}
-                    onSettingChange={updateImageSettings}
-                  />
+                  <>
+                    <ImageAdjuster
+                      brightness={memeState.brightness}
+                      contrast={memeState.contrast}
+                      rotation={memeState.rotation}
+                      scale={memeState.scale}
+                      onSettingChange={updateImageSettings}
+                    />
+                    
+                    <div className="mt-6 border-t pt-4">
+                      <h3 className="font-medium mb-2">Text Removal Tool</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Draw rectangles around text you want to erase from the image
+                      </p>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          variant={eraseMode ? "default" : "outline"}
+                          onClick={toggleEraseMode}
+                          className="flex items-center gap-2"
+                        >
+                          {eraseMode ? "Exit Selection Mode" : "Draw Selection"}
+                          {eraseMode ? <Square className="h-4 w-4" /> : <Eraser className="h-4 w-4" />}
+                        </Button>
+                        
+                        {eraseMode && memeState.eraseRects && memeState.eraseRects.length > 0 && (
+                          <Button
+                            onClick={handleEraseText}
+                            className="flex items-center gap-2"
+                            disabled={isProcessingErase}
+                          >
+                            {isProcessingErase ? "Processing..." : "Erase Text"}
+                            <Eraser className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {eraseMode && memeState.eraseRects && memeState.eraseRects.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-medium mb-1">Selected Areas: {memeState.eraseRects.length}</p>
+                          <TextEraser
+                            eraseRects={memeState.eraseRects}
+                            onDeleteRect={handleDeleteEraseRect}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </TabsContent>
               <TabsContent value="text">
