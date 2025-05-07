@@ -26,7 +26,7 @@ export const initialMemeTemplates = [
 
 // Version de la base de données des templates pour la gestion du cache
 // Incrémentez cette valeur pour forcer le rechargement du cache
-export const TEMPLATES_VERSION = "1.5.1"; // Incrémenté pour forcer le rechargement
+export const TEMPLATES_VERSION = "1.5.2"; // Incrémenté pour forcer le rechargement
 export const TEMPLATES_STORAGE_KEY = "meme_templates_database";
 export const TEMPLATES_VERSION_KEY = "meme_templates_version";
 

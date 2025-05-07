@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -145,8 +144,9 @@ const MemeEditor = () => {
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
       const reader = new FileReader();
       reader.onload = (e) => {
         const imageDataUrl = e.target?.result as string;
@@ -163,37 +163,61 @@ const MemeEditor = () => {
   };
 
   const handleOverlayImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    // Convert FileList to Array for easier processing
+    const filesArray = Array.from(files);
+    
+    // Create a copy of the current overlays to add to
+    const newOverlays = [...(memeState.imageOverlays || [])];
+    let processedCount = 0;
+    
+    // Process each file
+    filesArray.forEach((file, index) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const imageDataUrl = e.target?.result as string;
-        addImageOverlay(imageDataUrl, file.name);
+        
+        // Create new overlay
+        const newOverlay: ImageOverlayItem = {
+          id: generateId(),
+          src: imageDataUrl,
+          x: 50, // center percentage
+          y: 50, // center percentage
+          width: 100, // pixels or percentage based on implementation
+          height: 100, // pixels or percentage based on implementation
+          rotation: 0,
+          layerIndex: newOverlays.length + index,
+          name: file.name,
+        };
+        
+        newOverlays.push(newOverlay);
+        processedCount++;
+        
+        // Only update state and show toast when all files are processed
+        if (processedCount === filesArray.length) {
+          setMemeState({
+            ...memeState,
+            imageOverlays: newOverlays
+          });
+          
+          // Select the last added overlay
+          setSelectedOverlayId(newOverlays[newOverlays.length - 1].id);
+          
+          const message = filesArray.length === 1 
+            ? "Image overlay added!" 
+            : `${filesArray.length} image overlays added!`;
+          toast.success(message);
+        }
       };
       reader.readAsDataURL(file);
-    }
-  };
-
-  const addImageOverlay = (src: string, name?: string) => {
-    const newOverlay: ImageOverlayItem = {
-      id: generateId(),
-      src,
-      x: 50, // center percentage
-      y: 50, // center percentage
-      width: 100, // pixels or percentage based on implementation
-      height: 100, // pixels or percentage based on implementation
-      rotation: 0,
-      layerIndex: memeState.imageOverlays.length,
-      name: name,
-    };
-
-    setMemeState({
-      ...memeState,
-      imageOverlays: [...memeState.imageOverlays, newOverlay]
     });
     
-    setSelectedOverlayId(newOverlay.id);
-    toast.success("Image overlay added!");
+    // Reset the file input value to allow selecting the same files again
+    if (overlayFileInputRef.current) {
+      overlayFileInputRef.current.value = '';
+    }
   };
 
   const handleUrlImport = () => {
@@ -707,12 +731,13 @@ const MemeEditor = () => {
             </div>
           )}
           
-          {/* Hidden input for overlay images */}
+          {/* Hidden input for overlay images - Updated to support multiple files */}
           <input
             type="file"
             ref={overlayFileInputRef}
             className="hidden"
             accept="image/*"
+            multiple
             onChange={handleOverlayImageUpload}
           />
         </div>
