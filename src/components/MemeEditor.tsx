@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -472,6 +471,7 @@ const MemeEditor = () => {
     }
   };
   
+  // Function to handle mouse down on canvas for drawing eraser rectangles
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!eraseMode) return;
     
@@ -480,8 +480,13 @@ const MemeEditor = () => {
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / canvas.width) * 100;
-    const y = ((e.clientY - rect.top) / canvas.height) * 100;
+    // Calculate exact position based on the ratio between canvas visual size and actual size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Get position in canvas coordinate space rather than viewport space
+    const x = (((e.clientX - rect.left) * scaleX) / canvas.width) * 100;
+    const y = (((e.clientY - rect.top) * scaleY) / canvas.height) * 100;
     
     setStartPoint({ x, y });
     setCurrentRect({ x, y, width: 0, height: 0 });
@@ -493,11 +498,18 @@ const MemeEditor = () => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     
-    const currentX = ((e.clientX - rect.left) / canvas.width) * 100;
-    const currentY = ((e.clientY - rect.top) / canvas.height) * 100;
+    // Calculate with the same scaling factors for consistency
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
     
+    const currentX = (((e.clientX - rect.left) * scaleX) / canvas.width) * 100;
+    const currentY = (((e.clientY - rect.top) * scaleY) / canvas.height) * 100;
+    
+    // Calculate width and height based on the difference from starting point
     const width = Math.abs(currentX - startPoint.x);
     const height = Math.abs(currentY - startPoint.y);
+    
+    // Determine the top-left corner of the rectangle
     const x = Math.min(currentX, startPoint.x);
     const y = Math.min(currentY, startPoint.y);
     
