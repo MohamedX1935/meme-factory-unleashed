@@ -26,6 +26,7 @@ import ImageAdjuster from './ImageAdjuster';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import ImageOverlayEditor from './ImageOverlayEditor';
 import TextEraser from './TextEraser';
+import { TextEraser as TextEraserUtil } from '@/utils/textEraser';
 
 export type TextItem = {
   id: string;
@@ -107,6 +108,7 @@ const MemeEditor = () => {
   const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
   const [currentRect, setCurrentRect] = useState<{x: number, y: number, width: number, height: number} | null>(null);
   const [isProcessingErase, setIsProcessingErase] = useState(false);
+  const [processedCanvas, setProcessedCanvas] = useState<HTMLCanvasElement | null>(null);
 
   // If image has been loaded, restore from localStorage
   useEffect(() => {
@@ -464,6 +466,10 @@ const MemeEditor = () => {
     if (eraseMode) {
       // Exiting erase mode, clear current rect
       setCurrentRect(null);
+      // Reset to original image if there was a processed image
+      if (processedCanvas) {
+        setProcessedCanvas(null);
+      }
     } else {
       toast.info("Draw rectangles around text you want to remove", {
         description: "Click and drag to create selection boxes"
@@ -560,21 +566,18 @@ const MemeEditor = () => {
     toast.info("Processing image...");
     
     try {
-      // This function would implement the actual inpainting
-      // For now, we'll just add a delay to simulate processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        throw new Error("Canvas not available");
+      }
       
-      // In a real implementation, this would be replaced with actual inpainting code
-      // using a model like the one from Hugging Face
+      // Use the TextEraser utility to erase text from the image
+      const result = await TextEraserUtil.eraseText(canvas, memeState.eraseRects);
+      
+      // Store the processed canvas
+      setProcessedCanvas(result);
+      
       toast.success("Text removal complete!");
-      
-      // For now, just hide the rectangles as if the processing was done
-      setMemeState({
-        ...memeState,
-        eraseRects: []
-      });
-      
-      setEraseMode(false);
     } catch (error) {
       console.error("Error erasing text:", error);
       toast.error("Failed to process image");
@@ -600,6 +603,15 @@ const MemeEditor = () => {
       
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
+      // If we have a processed canvas with erased text, use that instead
+      if (processedCanvas && !eraseMode) {
+        ctx.drawImage(processedCanvas, 0, 0);
+        
+        // Continue with applying transformations, overlays, and text
+        drawOverlaysAndText(ctx, canvas);
+        return;
+      }
+      
       // Apply rotation
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
@@ -618,109 +630,114 @@ const MemeEditor = () => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.filter = 'none';
       
-      // Draw image overlays in order of layerIndex
-      const sortedOverlays = [...memeState.imageOverlays].sort((a, b) => a.layerIndex - b.layerIndex);
-      
-      sortedOverlays.forEach(overlay => {
-        const overlayImg = new Image();
-        overlayImg.onload = () => {
-          // Calculate position based on percentages
-          const x = (overlay.x / 100) * canvas.width;
-          const y = (overlay.y / 100) * canvas.height;
-          
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate((overlay.rotation * Math.PI) / 180);
-          
-          // Draw the overlay image centered at its position
-          ctx.drawImage(
-            overlayImg, 
-            -overlay.width / 2, 
-            -overlay.height / 2, 
-            overlay.width, 
-            overlay.height
-          );
-          
-          // Highlight selected overlay
-          if (selectedOverlayId === overlay.id) {
-            ctx.strokeStyle = '#4287f5';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
-          }
-          
-          ctx.restore();
-        };
-        overlayImg.src = overlay.src;
-      });
-      
-      // Draw texts
-      memeState.texts.forEach(textItem => {
-        if (textItem.isMemeStyle) {
-          // Meme style text with outline
-          ctx.font = `${textItem.fontSize}px ${textItem.fontFamily}, Impact, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          
-          // Calculate position based on percentages
-          const x = (textItem.x / 100) * canvas.width;
-          const y = (textItem.y / 100) * canvas.height;
-          
-          if (textItem.outline) {
-            ctx.strokeStyle = textItem.outlineColor;
-            ctx.lineWidth = textItem.fontSize / 15;
-            ctx.strokeText(textItem.text.toUpperCase(), x, y);
-          }
-          
-          ctx.fillStyle = textItem.color;
-          ctx.fillText(textItem.text.toUpperCase(), x, y);
-        } else {
-          // Regular text
-          ctx.font = `${textItem.fontSize}px ${textItem.fontFamily}, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = textItem.color;
-          
-          // Calculate position based on percentages
-          const x = (textItem.x / 100) * canvas.width;
-          const y = (textItem.y / 100) * canvas.height;
-          
-          ctx.fillText(textItem.text, x, y);
-        }
-      });
-      
-      // Draw erase rectangles in erase mode
-      if (eraseMode && memeState.eraseRects && memeState.eraseRects.length > 0) {
-        memeState.eraseRects.forEach((rect, index) => {
-          const x = (rect.x / 100) * canvas.width;
-          const y = (rect.y / 100) * canvas.height;
-          const width = (rect.width / 100) * canvas.width;
-          const height = (rect.height / 100) * canvas.height;
-          
-          ctx.strokeStyle = '#ff3b30';
+      drawOverlaysAndText(ctx, canvas);
+    };
+    
+    img.src = localImage;
+  };
+  
+  // Extracted function to draw overlays and text to avoid duplication
+  const drawOverlaysAndText = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
+    // Draw image overlays in order of layerIndex
+    const sortedOverlays = [...memeState.imageOverlays].sort((a, b) => a.layerIndex - b.layerIndex);
+    
+    sortedOverlays.forEach(overlay => {
+      const overlayImg = new Image();
+      overlayImg.onload = () => {
+        // Calculate position based on percentages
+        const x = (overlay.x / 100) * canvas.width;
+        const y = (overlay.y / 100) * canvas.height;
+        
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((overlay.rotation * Math.PI) / 180);
+        
+        // Draw the overlay image centered at its position
+        ctx.drawImage(
+          overlayImg, 
+          -overlay.width / 2, 
+          -overlay.height / 2, 
+          overlay.width, 
+          overlay.height
+        );
+        
+        // Highlight selected overlay
+        if (selectedOverlayId === overlay.id) {
+          ctx.strokeStyle = '#4287f5';
           ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, width, height);
-          
-          // Add a small label with the rectangle number
-          ctx.fillStyle = '#ff3b30';
-          ctx.font = '16px sans-serif';
-          ctx.fillText(`${index + 1}`, x + 10, y + 20);
-        });
+          ctx.strokeRect(-overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+        }
+        
+        ctx.restore();
+      };
+      overlayImg.src = overlay.src;
+    });
+    
+    // Draw texts
+    memeState.texts.forEach(textItem => {
+      if (textItem.isMemeStyle) {
+        // Meme style text with outline
+        ctx.font = `${textItem.fontSize}px ${textItem.fontFamily}, Impact, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Calculate position based on percentages
+        const x = (textItem.x / 100) * canvas.width;
+        const y = (textItem.y / 100) * canvas.height;
+        
+        if (textItem.outline) {
+          ctx.strokeStyle = textItem.outlineColor;
+          ctx.lineWidth = textItem.fontSize / 15;
+          ctx.strokeText(textItem.text.toUpperCase(), x, y);
+        }
+        
+        ctx.fillStyle = textItem.color;
+        ctx.fillText(textItem.text.toUpperCase(), x, y);
+      } else {
+        // Regular text
+        ctx.font = `${textItem.fontSize}px ${textItem.fontFamily}, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = textItem.color;
+        
+        // Calculate position based on percentages
+        const x = (textItem.x / 100) * canvas.width;
+        const y = (textItem.y / 100) * canvas.height;
+        
+        ctx.fillText(textItem.text, x, y);
       }
-      
-      // Draw current rectangle if in drawing mode
-      if (eraseMode && isDrawing && currentRect) {
-        const x = (currentRect.x / 100) * canvas.width;
-        const y = (currentRect.y / 100) * canvas.height;
-        const width = (currentRect.width / 100) * canvas.width;
-        const height = (currentRect.height / 100) * canvas.height;
+    });
+    
+    // Draw erase rectangles in erase mode
+    if (eraseMode && memeState.eraseRects && memeState.eraseRects.length > 0) {
+      memeState.eraseRects.forEach((rect, index) => {
+        const x = (rect.x / 100) * canvas.width;
+        const y = (rect.y / 100) * canvas.height;
+        const width = (rect.width / 100) * canvas.width;
+        const height = (rect.height / 100) * canvas.height;
         
         ctx.strokeStyle = '#ff3b30';
         ctx.lineWidth = 2;
         ctx.strokeRect(x, y, width, height);
-      }
-    };
+        
+        // Add a small label with the rectangle number
+        ctx.fillStyle = '#ff3b30';
+        ctx.font = '16px sans-serif';
+        ctx.fillText(`${index + 1}`, x + 10, y + 20);
+      });
+    }
     
-    img.src = localImage;
+    // Draw current rectangle if in drawing mode
+    if (eraseMode && isDrawing && currentRect) {
+      const x = (currentRect.x / 100) * canvas.width;
+      const y = (currentRect.y / 100) * canvas.height;
+      const width = (currentRect.width / 100) * canvas.width;
+      const height = (currentRect.height / 100) * canvas.height;
+      
+      ctx.strokeStyle = '#ff3b30';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, height);
+    }
   };
 
   // Render the meme whenever the state changes
@@ -823,6 +840,7 @@ const MemeEditor = () => {
     setMemeState(defaultMemeState);
     setLocalImage(null);
     setEraseMode(false);
+    setProcessedCanvas(null);
     toast.info("Meme editor reset");
   };
 
