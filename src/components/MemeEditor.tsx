@@ -574,8 +574,19 @@ const MemeEditor = () => {
       // Use the TextEraser utility to erase text from the image
       const result = await TextEraserUtil.eraseText(canvas, memeState.eraseRects);
       
+      console.log("Text erasure completed, updating display");
+      
       // Store the processed canvas
       setProcessedCanvas(result);
+      
+      // Clear the erase rectangles after successful processing
+      setMemeState(prevState => ({
+        ...prevState,
+        eraseRects: []
+      }));
+      
+      // Exit erase mode after processing is complete
+      setEraseMode(false);
       
       toast.success("Text removal complete!");
     } catch (error) {

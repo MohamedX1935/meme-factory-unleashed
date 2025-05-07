@@ -1,3 +1,4 @@
+
 import { pipeline, env } from '@huggingface/transformers';
 
 // Configure transformers.js to use WebGPU if available and avoid using browser cache
@@ -139,6 +140,7 @@ export class TextEraser {
         outputCtx.drawImage(areaCanvas, 0, 0, width, height, x, y, width, height);
       }
       
+      console.log('Text erasing completed successfully');
       return outputCanvas;
     } catch (error) {
       console.error('Error processing image:', error);
