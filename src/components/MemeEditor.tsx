@@ -179,7 +179,7 @@ const MemeEditor = () => {
       reader.onload = (e) => {
         const imageDataUrl = e.target?.result as string;
         
-        // Create new overlay
+        // Create new overlay using the fetched image
         const newOverlay: ImageOverlayItem = {
           id: generateId(),
           src: imageDataUrl,
@@ -268,7 +268,26 @@ const MemeEditor = () => {
           ctx?.drawImage(img, 0, 0);
           const dataUrl = canvas.toDataURL("image/png");
           
-          addImageOverlay(dataUrl, url.split('/').pop());
+          // Create new overlay using the fetched image
+          const newOverlay: ImageOverlayItem = {
+            id: generateId(),
+            src: dataUrl,
+            x: 50, // center percentage
+            y: 50, // center percentage
+            width: 100, // pixels or percentage based on implementation
+            height: 100, // pixels or percentage based on implementation
+            rotation: 0,
+            layerIndex: memeState.imageOverlays.length,
+            name: url.split('/').pop(),
+          };
+          
+          setMemeState({
+            ...memeState,
+            imageOverlays: [...(memeState.imageOverlays || []), newOverlay]
+          });
+          
+          setSelectedOverlayId(newOverlay.id);
+          toast.success("Image overlay added!");
         };
         img.onerror = () => {
           toast.error("Failed to load overlay image. Please check the URL or try another image.");
