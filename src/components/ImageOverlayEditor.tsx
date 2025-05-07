@@ -32,7 +32,7 @@ interface ImageOverlayEditorProps {
 }
 
 const ImageOverlayEditor: React.FC<ImageOverlayEditorProps> = ({
-  imageOverlays,
+  imageOverlays = [], // Fournir un tableau vide comme valeur par défaut
   selectedOverlayId,
   onSelectedOverlayChange,
   onOverlayChange,
@@ -43,7 +43,8 @@ const ImageOverlayEditor: React.FC<ImageOverlayEditorProps> = ({
   onBringForward,
   onSendBackward
 }) => {
-  const selectedOverlay = imageOverlays.find(overlay => overlay.id === selectedOverlayId);
+  // S'assurer que imageOverlays est défini avant d'appeler find
+  const selectedOverlay = imageOverlays?.find(overlay => overlay.id === selectedOverlayId) || null;
 
   return (
     <div className="space-y-4">
@@ -70,7 +71,7 @@ const ImageOverlayEditor: React.FC<ImageOverlayEditorProps> = ({
 
       {/* List of current overlays */}
       <div className="max-h-[200px] overflow-y-auto border rounded-md p-2 space-y-2">
-        {imageOverlays.length === 0 ? (
+        {!imageOverlays || imageOverlays.length === 0 ? (
           <div className="text-center py-2 text-muted-foreground">
             No stickers or images added yet
           </div>
