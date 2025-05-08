@@ -26,7 +26,7 @@ import ImageAdjuster from './ImageAdjuster';
 import { useLocalStorage } from '@/hooks/use-local-storage';
 import ImageOverlayEditor from './ImageOverlayEditor';
 import TextEraser from './TextEraser';
-import { TextEraser as TextEraserUtil } from '@/utils/textEraser';
+import { useRemoveTextZones } from '@/hooks/useRemoveTextZones';
 
 export type TextItem = {
   id: string;
@@ -107,8 +107,10 @@ const MemeEditor = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<{x: number, y: number} | null>(null);
   const [currentRect, setCurrentRect] = useState<{x: number, y: number, width: number, height: number} | null>(null);
-  const [isProcessingErase, setIsProcessingErase] = useState(false);
   const [processedCanvas, setProcessedCanvas] = useState<HTMLCanvasElement | null>(null);
+  
+  // API integration states
+  const { isLoading: isProcessingErase, error: eraseError, cleanedImage, removeTextZones } = useRemoveTextZones();
 
   // If image has been loaded, restore from localStorage
   useEffect(() => {
@@ -562,7 +564,6 @@ const MemeEditor = () => {
       return;
     }
     
-    setIsProcessingErase(true);
     toast.info("Processing image...");
     
     try {
@@ -571,29 +572,49 @@ const MemeEditor = () => {
         throw new Error("Canvas not available");
       }
       
-      // Use the TextEraser utility to erase text from the image
-      const result = await TextEraserUtil.eraseText(canvas, memeState.eraseRects);
+      // Convert canvas to dataURL
+      const imageDataUrl = canvas.toDataURL("image/jpeg", 0.9);
       
-      console.log("Text erasure completed, updating display");
+      // Call the API to process the image
+      await removeTextZones(imageDataUrl, memeState.eraseRects);
       
-      // Store the processed canvas
-      setProcessedCanvas(result);
-      
-      // Clear the erase rectangles after successful processing
-      setMemeState(prevState => ({
-        ...prevState,
-        eraseRects: []
-      }));
-      
-      // Exit erase mode after processing is complete
-      setEraseMode(false);
-      
-      toast.success("Text removal complete!");
+      // If we get here, we have a cleaned image from the API
+      if (cleanedImage) {
+        // Create a new image from the cleaned image data
+        const img = new Image();
+        img.onload = () => {
+          // Create a new canvas to store the processed result
+          const processedCanvas = document.createElement('canvas');
+          processedCanvas.width = canvas.width;
+          processedCanvas.height = canvas.height;
+          
+          const ctx = processedCanvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Store the processed canvas
+            setProcessedCanvas(processedCanvas);
+            
+            // Clear the erase rectangles
+            setMemeState(prevState => ({
+              ...prevState,
+              eraseRects: []
+            }));
+            
+            // Exit erase mode
+            setEraseMode(false);
+            
+            toast.success("Text removal complete!");
+          }
+        };
+        img.onerror = () => {
+          toast.error("Failed to load cleaned image");
+        };
+        img.src = cleanedImage;
+      }
     } catch (error) {
       console.error("Error erasing text:", error);
-      toast.error("Failed to process image");
-    } finally {
-      setIsProcessingErase(false);
+      toast.error(`Failed to process image: ${eraseError || 'Unknown error'}`);
     }
   };
   
@@ -754,7 +775,7 @@ const MemeEditor = () => {
   // Render the meme whenever the state changes
   useEffect(() => {
     renderMemeToCanvas();
-  }, [localImage, memeState, selectedOverlayId, eraseMode, currentRect, isDrawing]);
+  }, [localImage, memeState, selectedOverlayId, eraseMode, currentRect, isDrawing, processedCanvas]);
 
   const downloadMeme = () => {
     if (canvasRef.current) {
@@ -1030,6 +1051,12 @@ const MemeEditor = () => {
                             eraseRects={memeState.eraseRects}
                             onDeleteRect={handleDeleteEraseRect}
                           />
+                        </div>
+                      )}
+                      
+                      {eraseError && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+                          {eraseError}
                         </div>
                       )}
                     </div>
